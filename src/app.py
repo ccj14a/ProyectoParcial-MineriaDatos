@@ -171,3 +171,12 @@ with tab_informe:
     st.subheader("🏗️ Esquema y Arquitectura del Sistema")
     st.markdown("""
     A continuación, se detalla el flujo secuencial de los datos a lo largo de los diferentes componentes de software:
+
+    1. **Ingreso de texto:** el usuario escribe frases o carga un archivo CSV/Excel.
+    2. **Preprocesamiento:** la aplicación selecciona y normaliza los textos válidos.
+    3. **Vectorización:** `scikit-learn` transforma las palabras mediante Count Vectorizer o TF-IDF.
+    4. **Visualización:** `pandas` presenta la matriz generada y Streamlit grafica las frecuencias.
+    5. **Exportación:** el resultado se descarga como un nuevo archivo CSV.
+
+    **Tecnologías empleadas:** Python, Streamlit, pandas, scikit-learn y openpyxl.
+    """)
