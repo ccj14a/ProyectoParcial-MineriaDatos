@@ -170,4 +170,4 @@ with tab_informe:
     
     st.subheader("🏗️ Esquema y Arquitectura del Sistema")
     st.markdown("""
-    A continuación, se detalla el flujo secuencial de los datos a lo largo de los diferentes componentes de software:
+    			A continuación, se detalla el flujo secuencial de los datos a lo largo de los diferentes componentes de software:""")
