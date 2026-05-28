@@ -1,6 +1,6 @@
-import streamlit as st
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+import streamlit as st
 
 # ==========================================
 # ⚙️ CAPA DE LÓGICA Y PROCESAMIENTO (MODULAR)
@@ -25,24 +25,45 @@ def cargar_archivo(archivo):
         return None
 
 
-def limpiar_y_extraer_textos(df, columna):
-    """Extrae textos, elimina nulos y filtra valores por defecto de datasets reales."""
-    if columna not in df.columns:
-        return []
-
-    # Obtener lista de strings limpios
-    raw_textos = df[columna].dropna().astype(str).tolist()
-
-    # Filtro inteligente para datasets de Kaggle (evita ruido matemático de 'No Positive' / 'No Negative')
-    textos_limpios = [
-        linea.strip()
-        for linea in raw_textos
-        if linea.strip().lower() not in ["no negative", "no positive", ""]
-    ]
-    return textos_limpios
+def limpiar_texto_linea(linea):
+    """Normaliza una cadena de texto individual eliminando ruidos comunes."""
+    linea_str = str(linea).strip()
+    if linea_str.lower() in ["no negative", "no positive", "nan", "none", ""]:
+        return ""
+    return linea_str
 
 
-def vectorizar_textos(textos, vectorizador):
+def limpiar_y_extraer_textos(df, columna=None, procesar_todo=False):
+    """Extrae textos, elimina nulos y filtra valores por defecto de datasets reales.
+
+    Permite procesar una columna o consolidar todo el dataset de forma
+    horizontal.
+    """
+    if procesar_todo:
+        # Seleccionar solo columnas de tipo texto/objeto para no meter ruido de IDs o métricas puramente numéricas
+        columnas_texto = df.select_dtypes(include=["object", "string"]).columns.tolist()
+
+        if not columnas_texto:
+            return []
+
+        textos_limpios = []
+        for _, fila in df[columnas_texto].iterrows():
+            # Combinar todas las columnas de texto de la fila actual separadas por espacio
+            componentes = [limpiar_texto_linea(fila[col]) for col in columnas_texto]
+            frase_consolidada = " ".join(
+                [c for c in componentes if c]
+            )  # Filtrar vacíos
+            textos_limpios.append(frase_consolidada)
+
+        return textos_limpios
+    else:
+        if columna not in df.columns:
+            return []
+        raw_textos = df[columna].fillna("").astype(str).tolist()
+        return [limpiar_texto_linea(t) for t in raw_textos if limpiar_texto_linea(t)]
+
+
+def vectorizer_textos(textos, vectorizador):
     """Genera la matriz numérica y gestiona excepciones de vocabulario de forma segura."""
     try:
         matriz = vectorizador.fit_transform(textos)
@@ -76,10 +97,8 @@ if "ingresar" not in st.session_state:
 # 🏠 CAPA DE BIENVENIDA (LANDING PAGE - UI/UX EXPERT)
 # =========================================================
 if not st.session_state["ingresar"]:
-    # Espaciado superior estético
     st.markdown("<br><br>", unsafe_allow_html=True)
 
-    # Contenedor principal alineado al centro
     col_cen, col_der, col_izq = st.columns([1, 8, 1])
     with col_der:
         st.markdown(
@@ -94,7 +113,6 @@ if not st.session_state["ingresar"]:
             unsafe_allow_html=True,
         )
 
-        # Tarjetas de presentación de funcionalidades mediante columnas con iconos nativos
         tc1, tc2, tc3 = st.columns(3)
         with tc1:
             st.markdown(
@@ -129,13 +147,8 @@ if not st.session_state["ingresar"]:
 
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-        # Botón de ingreso central y estilizado de gran tamaño
-        # Botón de ingreso central y estilizado de gran tamaño
         b1, b2, b3 = st.columns([2, 2, 2])
         with b2:
-            # 🔥 CORRECCIÓN DE SCROLL NATIIVA: Al presionar el botón, cambiamos el estado
-            # e inmediatamente llamamos a st.rerun() antes de pintar cualquier componente.
-            # Esto destruye la posición previa del scroll del navegador.
             if st.button(
                 "🚀 INICIAR ANALÍTICA DE TEXTO",
                 use_container_width=True,
@@ -144,7 +157,6 @@ if not st.session_state["ingresar"]:
                 st.session_state["ingresar"] = True
                 st.rerun()
 
-        # Créditos institucionales al pie de la landing page
         st.markdown("<br><br><br><br>", unsafe_allow_html=True)
         st.markdown(
             """
@@ -160,13 +172,11 @@ if not st.session_state["ingresar"]:
 # ⚙️ ENTORNO DEL APLICATIVO PRINCIPAL (TABS)
 # =========================================================
 else:
-    # Sidebar - Control de versión y Metadatos
-    st.sidebar.caption("📌 Versión de la Aplicación: v1.4.0 (Dashboard Avanzado)")
+    st.sidebar.caption("📌 Versión de la Aplicación: v1.5.0 (Global Vectorizer)")
     st.sidebar.markdown("**Desarrolladores:**")
     st.sidebar.markdown("- Jeferson Coronado Cortez\n- Silva Burga Bryan")
     st.sidebar.markdown("---")
 
-    # Botón en el Sidebar para permitir regresar a la pantalla de bienvenida si se desea
     if st.sidebar.button("🏠 Volver al Inicio", use_container_width=True):
         st.session_state["ingresar"] = False
         st.rerun()
@@ -179,17 +189,13 @@ else:
         ]
     )
 
-    # ------------------------------------------
-    # PESTAÑA 1: LA APLICACIÓN INTERACTIVA
-    # ------------------------------------------
     with tab_app:
         st.title("📊 Sistema de Vectorización y Visualización de Texto")
-        # 🔥 ANCLA DE SCROLL: Fuerza al navegador a subir al inicio al renderizar esta pestaña
+
         st.components.v1.html(
             "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
             height=0,
         )
-        
 
         st.text_input(
             "Foco_Scroll",
@@ -228,34 +234,56 @@ else:
             )
 
             if archivo_cargado is not None:
-                # DETECCIÓN DE CAMBIO DE ARCHIVO: Si el nombre cambia, destruimos la memoria vieja inmediatamente
-                if (
-                    "nombre_archivo" in st.session_state
-                    and st.session_state["nombre_archivo"] != archivo_cargado.name
-                ):
+                # 🔄 DETECCIÓN DE CAMBIO REAL: Verificamos el nombre O si el contenido interno cambió
+                # Guardamos el hash o valor del archivo para saber si es un archivo editado
+                contenido_hash = hash(archivo_cargado.getvalue())
+                
+                cambio_nombre = "nombre_archivo" in st.session_state and st.session_state["nombre_archivo"] != archivo_cargado.name
+                cambio_contenido = "hash_archivo" in st.session_state and st.session_state["hash_archivo"] != contenido_hash
+
+                if cambio_nombre or cambio_contenido:
+                    # Si algo cambió, destruimos inmediatamente la memoria vieja para forzar la re-lectura
                     if "df_actual" in st.session_state:
                         del st.session_state["df_actual"]
 
-                # Almacenar en caché del estado de Streamlit para no re-leer el archivo en cada clic
+                # Almacenar en caché el nuevo estado si no existe
                 if "df_actual" not in st.session_state:
                     st.session_state["df_actual"] = cargar_archivo(archivo_cargado)
                     st.session_state["nombre_archivo"] = archivo_cargado.name
+                    st.session_state["hash_archivo"] = contenido_hash # Guardamos el identificador único del contenido
 
                 df = st.session_state["df_actual"]
 
                 if df is not None:
-                    # Layout de dos columnas: Izquierda para elegir, Derecha para previsualizar el archivo original
                     col_sel, col_prev = st.columns([1, 2])
 
                     with col_sel:
-                        st.markdown("##### 🔍 Selección de Target")
-                        # Forzamos un key único dinámico basado en el nombre del archivo para resetear el selector
-                        columna_texto = st.selectbox(
-                            "Selecciona la columna con el texto que deseas vectorizar:",
-                            options=df.columns,
-                            key=f"col_{archivo_cargado.name}",
+                        st.markdown("##### 🔍 Enfoque de Procesamiento")
+                        enfoque = st.radio(
+                            "¿Cómo deseas aplicar la vectorización?",
+                            [
+                                "Columna Única (Target Específico)",
+                                "Todo el Dataset (Combinar columnas textuales)",
+                            ],
+                            key=f"enfoque_{archivo_cargado.name}",
                         )
-                        textos_a_procesar = limpiar_y_extraer_textos(df, columna_texto)
+
+                        if enfoque == "Columna Única (Target Específico)":
+                            columna_texto = st.selectbox(
+                                "Selecciona la columna target:",
+                                options=df.columns,
+                                key=f"col_{archivo_cargado.name}",
+                            )
+                            textos_a_procesar = limpiar_y_extraer_textos(
+                                df, columna=columna_texto, procesar_todo=False
+                            )
+                        else:
+                            st.caption(
+                                "ℹ️ El sistema consolidará automáticamente todas las columnas categóricas y de texto en un solo corpus por fila."
+                            )
+                            textos_a_procesar = limpiar_y_extraer_textos(
+                                df, procesar_todo=True
+                            )
 
                     with col_prev:
                         st.markdown(
@@ -263,46 +291,41 @@ else:
                         )
                         st.dataframe(df.head(3), use_container_width=True)
 
-                    if textos_a_procesar:
+                    if textos_a_procesar and any(t.strip() for t in textos_a_procesar):
                         st.success(
-                            f"✅ Filtro aplicado: {len(textos_a_procesar)} filas válidas listas para procesamiento matemático."
+                            f"✅ Filtro aplicado: {len(textos_a_procesar)} filas listas para procesamiento matemático."
                         )
 
-                        # =========================================================
-                        # 📈 MÓDULO: ANALÍTICA EXPLORATORIA (EDA DASHBOARD)
-                        # =========================================================
                         with st.expander(
                             "📊 Ver Dashboard Estadístico del Dataset (EDA)",
                             expanded=False,
                         ):
                             st.markdown("### 🔬 Diagnóstico Exploratorio de los Textos")
 
-                            # Conversión rápida a serie para métricas de longitud
                             series_textos = pd.Series(textos_a_procesar)
                             longitudes_caracteres = series_textos.str.len()
                             conteo_palabras = series_textos.str.split().str.len()
 
-                            # Kpis en tarjetas
                             kpi1, kpi2, kpi3, kpi4 = st.columns(4)
                             kpi1.metric("Filas Totales", f"{len(df):,}")
                             kpi2.metric(
-                                "Filas Procesables", f"{len(textos_a_procesar):,}"
+                                "Filas Procesables",
+                                f"{len(textos_a_procesar):,}",
                             )
                             kpi3.metric(
                                 "Promedio de Palabras",
                                 f"{int(conteo_palabras.mean())} palabras",
                             )
                             kpi4.metric(
-                                "Máx. Caracteres", f"{longitudes_caracteres.max():,}"
+                                "Máx. Caracteres",
+                                f"{longitudes_caracteres.max():,}",
                             )
 
-                            # Gráficas analíticas descriptivas
                             g1, g2 = st.columns(2)
                             with g1:
                                 st.markdown(
                                     "**Distribución del tamaño de los textos (Caracteres)**"
                                 )
-                                # Agrupar las longitudes en rangos para usar el gráfico nativo estable
                                 counts, bins = pd.cut(
                                     longitudes_caracteres, bins=10, retbins=True
                                 )
@@ -326,16 +349,16 @@ else:
                                 st.bar_chart(df_hist_2)
                     else:
                         st.error(
-                            "❌ La columna seleccionada no contiene texto válido o solo contiene celdas vacías."
+                            "❌ La selección actual no contiene texto válido o el dataset no posee columnas de tipo cadena."
                         )
 
         # --- APLICACIÓN DEL MODELO MATEMÁTICO ---
-        if len(textos_a_procesar) > 0:
+        if len(textos_a_procesar) > 0 and any(t.strip() for t in textos_a_procesar):
             st.markdown("---")
             st.subheader("⚙️ 2. Configuración y Aplicación del Modelo")
             st.info(
                 "🔎 **Preprocesamiento automático:** Los textos se convierten a minúsculas, se remueve la puntuación, "
-                "se descartan nulos y se extraen palabras (tokens) alfanuméricas de 2 o más caracteres."
+                "se descartan nulos globales y se extraen tokens alfanuméricos de 2 o más caracteres."
             )
 
             tipo_vectorizacion = st.selectbox(
@@ -349,18 +372,15 @@ else:
             )
 
             st.markdown("#### 🧮 Ecuación del Modelo Seleccionado")
-
-            # PODA DE VOCABULARIO CRÍTICA: Limitamos a las 1500 palabras más importantes para proteger la memoria RAM
             MAX_FEATURES = 1500
 
-            # Inyección dinámica de hiperparámetros y fórmulas
             if tipo_vectorizacion == "Count Vectorizer (Bag of Words)":
                 st.info(
                     "💡 **Count Vectorizer:** Construye un espacio vectorial basado únicamente en la frecuencia absoluta de aparición de cada token."
                 )
                 st.latex(r"Vector\_D_i = [f(w_1), f(w_2), \dots, f(w_n)]")
                 st.caption(
-                    "Donde $f(w_j)$ representa la frecuencia o conteo del término $j$ dentro del documento $i$."
+                    "Donde $f(w_j)$ representa la frecuencia del término $j$ dentro del documento $i$."
                 )
                 vectorizador = CountVectorizer(
                     lowercase=True, max_features=MAX_FEATURES
@@ -368,13 +388,10 @@ else:
 
             elif tipo_vectorizacion == "Vectorización Binaria (Presencia/Ausencia)":
                 st.info(
-                    "💡 **Vectorización Binaria:** Indica únicamente si cada término aparece en el documento, sin importar su frecuencia de repetición."
+                    "💡 **Vectorización Binaria:** Indica únicamente si cada término aparece en el documento, sin importar su frecuencia."
                 )
                 st.latex(
                     r"x_{ij} = \begin{cases} 1, & \text{si el término } j \text{ aparece en el documento } i \\ 0, & \text{si no aparece} \end{cases}"
-                )
-                st.caption(
-                    "Cada columna representa un término; el valor mapea presencia (1) o ausencia (0)."
                 )
                 vectorizador = CountVectorizer(
                     lowercase=True, binary=True, max_features=MAX_FEATURES
@@ -389,13 +406,11 @@ else:
                     list(OPCIONES_NGRAMAS.keys()),
                 )
                 rango_ngrama = OPCIONES_NGRAMAS[opcion_ngrama]
-
                 st.latex(r"x_{ij} = f(g_j, d_i)")
-                st.caption(
-                    "Donde $g_j$ es el n-grama $j$, $d_i$ es el documento $i$ y $f$ es la frecuencia de la secuencia."
-                )
                 vectorizador = CountVectorizer(
-                    lowercase=True, ngram_range=rango_ngrama, max_features=MAX_FEATURES
+                    lowercase=True,
+                    ngram_range=rango_ngrama,
+                    max_features=MAX_FEATURES,
                 )
 
             else:
@@ -406,9 +421,6 @@ else:
                 st.latex(r"idf(t) = \log\left(\frac{1 + N}{1 + df(t)}\right) + 1")
                 st.latex(
                     r"\widetilde{x}_{t,d} = tf(t,d) \times idf(t) \quad \longrightarrow \quad x_d = \frac{\widetilde{x}_d}{\sqrt{\sum_j \widetilde{x}_{j,d}^{\,2}}}"
-                )
-                st.caption(
-                    "Aplica la variante exacta de scikit-learn con suavizado de IDF y normalización euclidiana L2."
                 )
                 vectorizador = TfidfVectorizer(
                     lowercase=True, max_features=MAX_FEATURES
@@ -421,17 +433,15 @@ else:
             with st.spinner(
                 "Ejecutando transformaciones matriciales en el espacio vectorial..."
             ):
-                matriz_num, vocabulario = vectorizar_textos(
+                matriz_num, vocabulario = vectorizer_textos(
                     textos_a_procesar, vectorizador
                 )
 
             if matriz_num is None:
                 st.error(
-                    "❌ Error de Vocabulario: Los textos procesados no contienen suficientes caracteres válidos para construir una matriz."
+                    "❌ Error de Vocabulario: Los textos procesados no contienen suficientes tokens válidos."
                 )
             else:
-                # 🔥 SOLUCIÓN DEFINITIVA: Mantenemos el DataFrame en formato disperso (Sparse)
-                # Eliminamos por completo .to_dense() para que NO consuma esos 3GB de RAM independientes
                 with st.spinner(
                     "Estructurando matriz en bloques de memoria optimizados..."
                 ):
@@ -439,9 +449,8 @@ else:
                         matriz_num, columns=vocabulario
                     )
 
-                # Ajustamos dinámicamente la longitud de los textos por si el tokenizador descartó filas vacías
                 textos_ajustados = textos_a_procesar[: len(df_resultado)]
-                df_resultado.insert(0, "Texto_Original", textos_ajustados)
+                df_resultado.insert(0, "Texto_Consolidado_O_Target", textos_ajustados)
 
                 sub_tab1, sub_tab2 = st.tabs(
                     ["📋 Nuevo Dataset Vectorizado", "📈 Análisis de Frecuencias"]
@@ -451,9 +460,6 @@ else:
                     st.markdown(
                         "##### Vista Previa de la Matriz Generada (Documento $\\times$ Término)"
                     )
-                    # 🔥 SOLUCIÓN AL TYPEERROR:
-                    # Convertimos a denso ÚNICAMENTE el bloque de las 500 filas para que Streamlit pueda pintarlo
-                    # El resto del DataFrame principal sigue comprimido en memoria resguardando la RAM.
                     df_vista_previa = df_resultado.head(500).copy()
                     for col in df_vista_previa.columns:
                         if hasattr(df_vista_previa[col], "sparse"):
@@ -466,7 +472,6 @@ else:
                         f"💡 Nota: Por rendimiento de la interfaz web, se visualizan las primeras 500 filas de las {len(df_resultado)} procesadas."
                     )
 
-                    # 📥 OPTIMIZACIÓN DE DESCARGA: Convertimos a CSV de forma directa y segura
                     @st.cache_data
                     def optimizar_conversion_csv(df_datos):
                         return df_datos.to_csv(index=False).encode("utf-8")
@@ -477,26 +482,21 @@ else:
                     st.download_button(
                         label="💾 Guardar y Descargar Nuevo Dataset (CSV)",
                         data=csv_bytes,
-                        file_name="nuevo_dataset_vectorizado.csv",
+                        file_name="dataset_vectorizado_completo.csv",
                         mime="text/csv",
                         use_container_width=True,
                     )
 
                 with sub_tab2:
                     st.markdown("##### Distribución de Peso / Frecuencia en el Corpus")
-
-                    # 🔥 SOLUCIÓN AL SEGUNDO TYPEERROR:
-                    # Eliminamos la columna de texto original, sumamos los pesos, extraemos el top 20
-                    # y convertimos la serie final a flotantes nativos densos usando .astype(float)
                     pesos_acumulados = (
-                        df_resultado.drop(columns=["Texto_Original"])
+                        df_resultado.drop(columns=["Texto_Consolidado_O_Target"])
                         .sum()
                         .sort_values(ascending=False)
                         .head(20)
                     )
 
                     if not pesos_acumulados.empty:
-                        # Convertimos explícitamente a denso para que la librería gráfica no explote
                         pesos_acumulados_densos = pesos_acumulados.astype(float)
                         st.bar_chart(pesos_acumulados_densos)
                     else:
@@ -527,26 +527,8 @@ else:
         with col2:
             st.subheader("📌 Grabado de Versión")
             st.info(
-                "**Versión Actual:** v1.4.0  \n**Última Modificación:** Mayo 2026  \n**Cambios:** Se agregó una Landing Page interactiva, panel de Diagnóstico Exploratorio (EDA), KPIs estadísticos en tiempo real, histogramas de distribución y control robusto de fallas de parseo."
+                "**Versión Actual:** v1.5.0  \n**Última Modificación:** Mayo 2026  \n**Cambios:** Se agregó la funcionalidad de procesamiento global multicolumna (Todo el Dataset), optimización de merges textuales horizontales y persistencia matricial en formato Sparse."
             )
-
-        st.markdown("### 🚀 Procedimiento de Puesta en Marcha")
-        st.code(
-            "pip install streamlit scikit-learn pandas openpyxl\nstreamlit run src/app.py --server.maxUploadSize 1024",
-            language="bash",
-        )
-
-        st.markdown("""
-        ### 🛑 Restricciones del Sistema
-        1. **Formatos:** Soporta estrictamente archivos estructurados `.csv` y `.xlsx`.
-        2. **Filtro Automático:** Ignora de manera automática cadenas vacías y respuestas nulas del tipo 'No Positive' o 'No Negative'.
-        3. **Poda de Dimensionalidad:** Limita el espacio vectorial automáticamente a las 1,500 características de mayor peso formal para resguardar la estabilidad de la memoria RAM.
-        
-        ### 🎯 Guía Operativa con Carga Masiva
-        * **Paso 1:** Suba el archivo en la sección 1. Automáticamente se desplegará una **Vista Previa** de la tabla original a la derecha. Use el selector desplegable de la izquierda para indicarle al sistema cuál columna contiene el texto libre que quiere analizar. Puedes expandir el panel **EDA** para ver estadísticas de distribución del texto.
-        * **Paso 2:** Seleccione la técnica matemática. Verifique la ecuación en KaTeX.
-        * **Paso 3:** Descargue el nuevo dataset estructurado listo para minería de datos secundaria.
-        """)
 
     # ------------------------------------------
     # PESTAÑA 3: INFORME DE LA APLICACIÓN
@@ -554,14 +536,11 @@ else:
     with tab_informe:
         st.header("📄 Informe Técnico de la Aplicación")
         st.markdown("---")
-
         st.subheader("🏗️ Esquema y Arquitectura del Sistema")
         st.markdown("""
         La arquitectura implementa un desacoplamiento lógico basado en el patrón **Capa de Datos - Capa de Presentación**:
         
-        1. **Capa de Entrada y Caché (I/O):** Lee los buffers binarios de los archivos subidos. Utiliza la persistencia `st.session_state` con destrucción activa de estados cruzados para permitir la alternancia fluida entre diferentes archivos en disco de forma dinámica.
-        2. **Capa de Diagnóstico Analítico (EDA):** Extrae de manera nativa la distribución estadística del corpus (conteo de palabras y caracteres) para proporcionar un contexto del volumen informacional antes de inicializar la fase matricial.
-        3. **Capa de Limpieza Integrada:** Un bloque de normalización descarta valores atípicos, nulos y strings de control de Kaggle de manera automatizada antes de pasarlos a la matriz.
-        4. **Capa de Cómputo Vectorial:** Invoca motores de cálculo matricial paralelos limitados a 1,500 componentes principales para evitar el desbordamiento de memoria por dimensionalidad densa.
-        5. **Capa de Almacenamiento Estructurado:** Transforma objetos dispersos (*Scipy Sparse Matrix*) a DataFrames bidimensionales de `pandas` acoplando longitudes de vectores de forma segura.
+        1. **Capa de Entrada y Caché (I/O):** Permite aislar la lectura del archivo e inyectar el método de combinación lineal horizontal de strings si se desea procesar el dataset entero.
+        2. **Capa de Diagnóstico Analítico (EDA):** Extrae la distribución estadística estructural de la recopilación consolidada o de la columna objetivo.
+        3. **Capa de Cómputo Vectorial:** Aplica transformaciones de minería de texto usando la representación optimizada de Scipy para transferir dataframes sin sobrecargar la RAM del servidor.
         """)
