@@ -181,13 +181,7 @@ else:
         st.session_state["ingresar"] = False
         st.rerun()
 
-    tab_app, tab_manual, tab_informe = st.tabs(
-        [
-            "🚀 1. Aplicación Ejecutable",
-            "📖 2. Manual de Usuario",
-            "📄 3. Informe de la Aplicación",
-        ]
-    )
+    (tab_app,) = st.tabs(["🚀 1. Aplicación Ejecutable"])
 
     with tab_app:
         st.title("📊 Sistema de Vectorización y Visualización de Texto")
@@ -237,7 +231,7 @@ else:
                 # 🔄 DETECCIÓN DE CAMBIO REAL: Verificamos el nombre O si el contenido interno cambió
                 # Guardamos el hash o valor del archivo para saber si es un archivo editado
                 contenido_hash = hash(archivo_cargado.getvalue())
-                
+
                 cambio_nombre = "nombre_archivo" in st.session_state and st.session_state["nombre_archivo"] != archivo_cargado.name
                 cambio_contenido = "hash_archivo" in st.session_state and st.session_state["hash_archivo"] != contenido_hash
 
@@ -458,19 +452,19 @@ else:
 
                 with sub_tab1:
                     st.markdown("##### Vista Previa de la Matriz Generada (Documento $\\times$ Término)")
-    
-                        # 1. Tomamos las primeras 500 filas
+
+                    # 1. Tomamos las primeras 500 filas
                     df_vista_previa = df_resultado.head(500).copy()
-                        
-                        # 2. Convertimos a denso y reemplazamos los Sparse-Nones por 0 de manera segura
+
+                    # 2. Convertimos a denso y reemplazamos los Sparse-Nones por 0 de manera segura
                     for col in df_vista_previa.columns:
-                            if hasattr(df_vista_previa[col], "sparse"):
-                                df_vista_previa[col] = df_vista_previa[col].sparse.to_dense()
-                                
-                        # 🔥 SOLUCIÓN: Reemplaza cualquier None/NaN residual por 0 numérico para la interfaz gráfica
+                        if hasattr(df_vista_previa[col], "sparse"):
+                            df_vista_previa[col] = df_vista_previa[col].sparse.to_dense()
+
+                    # 🔥 SOLUCIÓN: Reemplaza cualquier None/NaN residual por 0 numérico para la interfaz gráfica
                     df_vista_previa = df_vista_previa.fillna(0)
 
-                        # 3. Renderizar el dataframe limpio
+                    # 3. Renderizar el dataframe limpio
                     st.dataframe(df_vista_previa, use_container_width=True)
                     st.caption(
                             f"💡 Nota: Por rendimiento de la interfaz web, se visualizan las primeras 500 filas de las {len(df_resultado)} procesadas."
@@ -511,40 +505,3 @@ else:
             st.warning(
                 "⚠️ Esperando el ingreso de datos válidos para inicializar los motores matemáticos."
             )
-
-    # ------------------------------------------
-    # PESTAÑA 2: MANUAL DE USUARIO
-    # ------------------------------------------
-    with tab_manual:
-        st.header("📘 Manual de Usuario")
-        st.markdown("---")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("🏢 Carátula de Operación")
-            st.markdown("""
-            * **Curso:** Minería de Datos
-            * **Evaluación:** Examen Parcial
-            * **Integrantes:** Jeferson Coronado Cortez y Silva Burga Bryan
-            * **Estado:** Aplicación de nivel profesional optimizada para Kaggle
-            """)
-        with col2:
-            st.subheader("📌 Grabado de Versión")
-            st.info(
-                "**Versión Actual:** v1.5.0  \n**Última Modificación:** Mayo 2026  \n**Cambios:** Se agregó la funcionalidad de procesamiento global multicolumna (Todo el Dataset), optimización de merges textuales horizontales y persistencia matricial en formato Sparse."
-            )
-
-    # ------------------------------------------
-    # PESTAÑA 3: INFORME DE LA APLICACIÓN
-    # ------------------------------------------
-    with tab_informe:
-        st.header("📄 Informe Técnico de la Aplicación")
-        st.markdown("---")
-        st.subheader("🏗️ Esquema y Arquitectura del Sistema")
-        st.markdown("""
-        La arquitectura implementa un desacoplamiento lógico basado en el patrón **Capa de Datos - Capa de Presentación**:
-        
-        1. **Capa de Entrada y Caché (I/O):** Permite aislar la lectura del archivo e inyectar el método de combinación lineal horizontal de strings si se desea procesar el dataset entero.
-        2. **Capa de Diagnóstico Analítico (EDA):** Extrae la distribución estadística estructural de la recopilación consolidada o de la columna objetivo.
-        3. **Capa de Cómputo Vectorial:** Aplica transformaciones de minería de texto usando la representación optimizada de Scipy para transferir dataframes sin sobrecargar la RAM del servidor.
-        """)
