@@ -457,20 +457,24 @@ else:
                 )
 
                 with sub_tab1:
-                    st.markdown(
-                        "##### Vista Previa de la Matriz Generada (Documento $\\times$ Término)"
-                    )
+                    st.markdown("##### Vista Previa de la Matriz Generada (Documento $\\times$ Término)")
+    
+                        # 1. Tomamos las primeras 500 filas
                     df_vista_previa = df_resultado.head(500).copy()
+                        
+                        # 2. Convertimos a denso y reemplazamos los Sparse-Nones por 0 de manera segura
                     for col in df_vista_previa.columns:
-                        if hasattr(df_vista_previa[col], "sparse"):
-                            df_vista_previa[col] = df_vista_previa[
-                                col
-                            ].sparse.to_dense()
+                            if hasattr(df_vista_previa[col], "sparse"):
+                                df_vista_previa[col] = df_vista_previa[col].sparse.to_dense()
+                                
+                        # 🔥 SOLUCIÓN: Reemplaza cualquier None/NaN residual por 0 numérico para la interfaz gráfica
+                    df_vista_previa = df_vista_previa.fillna(0)
 
+                        # 3. Renderizar el dataframe limpio
                     st.dataframe(df_vista_previa, use_container_width=True)
                     st.caption(
-                        f"💡 Nota: Por rendimiento de la interfaz web, se visualizan las primeras 500 filas de las {len(df_resultado)} procesadas."
-                    )
+                            f"💡 Nota: Por rendimiento de la interfaz web, se visualizan las primeras 500 filas de las {len(df_resultado)} procesadas."
+                        )
 
                     @st.cache_data
                     def optimizar_conversion_csv(df_datos):
